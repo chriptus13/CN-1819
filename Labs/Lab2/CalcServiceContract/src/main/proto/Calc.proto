@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "calcstubs";
+
+package calcservice; // package do proto
+
+// The greeting service definition.
+service CalcService {
+    rpc add (OperationRequest) returns (OperationReply);
+    rpc findPrimes (NumOfPrimes) returns (stream Prime);
+    rpc addAll (stream Num) returns (OperationReply);
+}
+
+// The request message containing the user's name.
+message OperationRequest {
+    double op1 = 1;
+    double op2 = 2;
+}
+
+// The response message containing the greetings
+message OperationReply {
+    double res = 1;
+}
+
+message Num {
+    int32 i = 1;
+}
+
+message NumOfPrimes {
+    int32 numOfPrimes = 1;
+    int32 startNum = 2;
+}
+
+message Prime {
+    int32 prime = 1;
+}

@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+option java_multiple_files = true;
+option java_package = "forum";
+
+package forum;
+
+service ForumService {
+	rpc topicSubscribe (SubscribeUnSubscribe) returns (stream ForumMessage);
+	rpc topicUnsubscribe (SubscribeUnSubscribe) returns (google.protobuf.Empty);
+	rpc getAllTopics (google.protobuf.Empty) returns (ExistingTopics);
+	rpc messagePublish (ForumMessage) returns (google.protobuf.Empty);
+}
+
+message SubscribeUnSubscribe {
+	string usrName = 1;
+	string topicName = 2;
+}
+
+message ExistingTopics {
+	// List of topic Names
+	repeated string topicName = 1;
+}
+
+message ForumMessage {
+	string fromUser = 1;
+	string topicName = 2;
+	string txtMsg = 3;
+}
