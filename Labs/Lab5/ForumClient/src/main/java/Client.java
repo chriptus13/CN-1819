@@ -30,8 +30,8 @@ public class Client {
             ptMessageBlob = Pattern.compile("([^;]*);([^\\s]+);([^\\s]+)"),
             ptTopics = Pattern.compile("/topics");
 
-    private static final String svc_ip = "104.199.5.92";
-    private static final int svc_port = 8000;
+    private static final String svc_ip = "35.189.126.73";
+    private static final int svc_port = 7001;
     private static ManagedChannel ch = ManagedChannelBuilder
             .forAddress(svc_ip, svc_port)
             .usePlaintext()
