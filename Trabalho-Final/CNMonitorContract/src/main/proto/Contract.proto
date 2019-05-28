@@ -1,14 +1,16 @@
 syntax = "proto3";
+
 import "google/protobuf/empty.proto";
+
 option java_multiple_files = true;
 option java_package = "cnphotos";
 
 package cnphotos;
 
-service cnPhotos {
+service CNPhotos {
     rpc getMonitorState (google.protobuf.Empty) returns (MonitorState);
     rpc changeInstanceLimits (InstanceLimit) returns (google.protobuf.Empty);
-    rpc changeTargetCpuUsage (TargetCpuUsage) returns (google.protobuf.Empty)
+    rpc changeTargetCpuUsage (TargetCpuUsage) returns (google.protobuf.Empty);
 }
 
 message MonitorState {

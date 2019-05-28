@@ -18,12 +18,6 @@ public class MonitoringAgent extends Thread {
     }
 
     @Override
-    public synchronized void start() {
-        super.start();
-        setDaemon(true);
-    }
-
-    @Override
     public void run() {
         try {
             ProjectTopicName tName = ProjectTopicName.of(projectId, topicName);
@@ -33,8 +27,9 @@ public class MonitoringAgent extends Thread {
             Sigar sigar = new Sigar();
             while (true) {
                 double perc = sigar.getCpuPerc().getCombined();
-                String msg = String.format("[%s]:%.4f", hostName, perc);
+                String msg = String.format("%s:%.4f", hostName, perc);
 
+                System.out.println(msg);
                 ByteString msgData = ByteString.copyFromUtf8(msg);
                 PubsubMessage pubsubMessage = PubsubMessage.newBuilder()
                         .setData(msgData)

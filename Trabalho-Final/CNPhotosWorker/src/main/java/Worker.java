@@ -29,20 +29,24 @@ import java.util.stream.Collectors;
 
 public class Worker {
     private static final String PROJECT_ID = ServiceOptions.getDefaultProjectId();
-    private static StorageOptions storageOptions = StorageOptions.getDefaultInstance();
-    private static Storage storage = storageOptions.getService();
-    private static FirestoreOptions firestoreOptions = FirestoreOptions.getDefaultInstance();
-    private static Firestore db = firestoreOptions.getService();
+    private static final String TOPIC_NAME = "CN_Photos_Metrics";
+    private static final long INTERVAL = 5_000;
+
+    private static final StorageOptions storageOptions = StorageOptions.getDefaultInstance();
+    private static final Storage storage = storageOptions.getService();
+
+    private static final FirestoreOptions firestoreOptions = FirestoreOptions.getDefaultInstance();
+    private static final Firestore db = firestoreOptions.getService();
+
+    private static final String PHOTO_SUB = "Subscription_A";
 
     public static void main(String[] args) {
-        String subscriptionName = "Subscription_A";
-        System.out.println("Worker Application");
-        new MonitoringAgent(PROJECT_ID, "", 1000).start();
-        subscribe(subscriptionName).awaitTerminated();
+        new MonitoringAgent(PROJECT_ID, TOPIC_NAME, INTERVAL).start();
+        subscribe().awaitTerminated();
     }
 
-    private static ApiService subscribe(String subscriptionName) {
-        ProjectSubscriptionName pSubName = ProjectSubscriptionName.of(PROJECT_ID, subscriptionName);
+    private static ApiService subscribe() {
+        ProjectSubscriptionName pSubName = ProjectSubscriptionName.of(PROJECT_ID, PHOTO_SUB);
         Subscriber subscriber = Subscriber.newBuilder(pSubName, Worker::work).build();
         ApiService service = subscriber.startAsync();
         service.awaitRunning();

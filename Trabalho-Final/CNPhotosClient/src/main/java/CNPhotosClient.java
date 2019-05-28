@@ -69,6 +69,7 @@ public class CNPhotosClient {
         } while (true);
     }
 
+    // 6 & 7
     private static void searchImage(int numberOfFaces) {
         ApiFuture<QuerySnapshot> querySnapshot =
                 db.collection("images").whereEqualTo("numberOfFaces", numberOfFaces).get();
@@ -84,6 +85,8 @@ public class CNPhotosClient {
         }, poolExecutor);
     }
 
+
+    // 6 & 7
     private static void searchImage(String label) {
         ApiFuture<QuerySnapshot> querySnapshot = db.collection("images")
                 .whereArrayContains("labels", label).get();
@@ -98,9 +101,13 @@ public class CNPhotosClient {
         }, poolExecutor);
     }
 
+    // 1
     private static void addImage(String topicName, String bucketName, String img) {
         try {
+            // 2.1
             BlobId blobId = addBlobToBucket(bucketName, img);
+
+            // 2.2
             publishMessageOnTopic(topicName, blobId.getBucket(), blobId.getName());
         } catch (Exception ex) {
             ex.printStackTrace();
