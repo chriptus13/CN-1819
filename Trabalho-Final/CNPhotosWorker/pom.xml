@@ -32,6 +32,14 @@
             <artifactId>google-cloud-vision</artifactId>
             <version>1.49.0</version>
         </dependency>
+
+        <dependency>
+            <groupId>org.hyperic</groupId>
+            <artifactId>sigar</artifactId>
+            <scope>system</scope>
+            <version>1.6.4</version>
+            <systemPath>${basedir}/sigar.jar</systemPath>
+        </dependency>
     </dependencies>
 
     <build>

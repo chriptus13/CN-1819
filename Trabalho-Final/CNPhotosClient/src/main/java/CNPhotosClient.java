@@ -10,6 +10,10 @@ import com.google.cloud.storage.*;
 import com.google.protobuf.ByteString;
 import com.google.pubsub.v1.ProjectTopicName;
 import com.google.pubsub.v1.PubsubMessage;
+import spark.ModelAndView;
+import spark.Request;
+import spark.Response;
+import spark.template.handlebars.HandlebarsTemplateEngine;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -23,7 +27,6 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
 public class CNPhotosClient {
     private static final Scanner sc = new Scanner(System.in);
     private static final Pattern ptAdd = Pattern.compile("/add ([^\\s]+)"),
@@ -37,6 +40,8 @@ public class CNPhotosClient {
     private static Firestore db = firestoreOptions.getService();
 
     // /add C:\Users\Asus\Desktop/cr7.jpg
+
+    private static String homeEndpoint = "/home";
 
     public static void main(String[] args) {
         String topicName = "Topic_T1",
@@ -167,5 +172,18 @@ public class CNPhotosClient {
         System.out.println("/search <labels> - search images containing labels");
         System.out.println("/exit - leave");
         System.out.println("*** **** ***");
+    }
+
+    private static Object index(Request request, Response response) {
+        response.redirect(homeEndpoint);
+        return "";
+    }
+
+    private static Object home(Request request, Response response) {
+        return render(null, "home.hbs");
+    }
+
+    public static String render(Map<String, Object> model, String templatePath) {
+        return new HandlebarsTemplateEngine().render(new ModelAndView(model, templatePath));
     }
 }

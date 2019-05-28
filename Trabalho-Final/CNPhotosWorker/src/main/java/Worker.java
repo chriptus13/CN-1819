@@ -37,6 +37,7 @@ public class Worker {
     public static void main(String[] args) {
         String subscriptionName = "Subscription_A";
         System.out.println("Worker Application");
+        new MonitoringAgent(PROJECT_ID, "", 1000).start();
         subscribe(subscriptionName).awaitTerminated();
     }
 

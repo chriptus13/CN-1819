@@ -11,5 +11,7 @@
     <modules>
         <module>CNPhotosClient</module>
         <module>CNPhotosWorker</module>
+        <module>CNWorkersMonitor</module>
+        <module>CNMonitorContract</module>
     </modules>
 </project>
