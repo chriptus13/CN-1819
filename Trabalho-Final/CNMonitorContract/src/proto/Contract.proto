@@ -13,7 +13,7 @@ service cnPhotos {
 
 message MonitorState {
     int32 nInstances = 1;
-    int32 cpuUsage = 2;
+    float cpuUsage = 2;
 }
 
 message InstanceLimit {
@@ -22,5 +22,5 @@ message InstanceLimit {
 }
 
 message TargetCpuUsage {
-    int32 usage = 1;
+    float usage = 1;
 }
