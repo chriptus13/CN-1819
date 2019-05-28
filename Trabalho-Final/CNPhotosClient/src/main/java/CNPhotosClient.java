@@ -1,3 +1,7 @@
+import cnphotos.CNPhotosGrpc;
+import cnphotos.InstanceLimit;
+import cnphotos.MonitorState;
+import cnphotos.TargetCpuUsage;
 import com.google.api.core.ApiFuture;
 import com.google.cloud.ServiceOptions;
 import com.google.cloud.WriteChannel;
@@ -8,12 +12,12 @@ import com.google.cloud.firestore.QuerySnapshot;
 import com.google.cloud.pubsub.v1.Publisher;
 import com.google.cloud.storage.*;
 import com.google.protobuf.ByteString;
+import com.google.protobuf.Empty;
 import com.google.pubsub.v1.ProjectTopicName;
 import com.google.pubsub.v1.PubsubMessage;
-import spark.ModelAndView;
-import spark.Request;
-import spark.Response;
-import spark.template.handlebars.HandlebarsTemplateEngine;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
+import io.grpc.stub.StreamObserver;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -27,11 +31,14 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
 public class CNPhotosClient {
     private static final Scanner sc = new Scanner(System.in);
     private static final Pattern ptAdd = Pattern.compile("/add ([^\\s]+)"),
             ptSearchLabels = Pattern.compile("/searchLabels (.+)"),
-            ptSearchFaces = Pattern.compile("/searchFaces (\\d+)");
+            ptSearchFaces = Pattern.compile("/searchFaces (\\d+)"),
+            ptSetMonitorTarget = Pattern.compile("/setMonTargetPerc (\\d+)"),
+            ptSetMonitorMaxMin = Pattern.compile("setMonInstanceMaxMin (\\d+) (\\d+)");
     private static final String PROJECT_ID = ServiceOptions.getDefaultProjectId();
     private static final Executor poolExecutor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
     private static StorageOptions storageOptions = StorageOptions.getDefaultInstance();
@@ -39,9 +46,13 @@ public class CNPhotosClient {
     private static FirestoreOptions firestoreOptions = FirestoreOptions.getDefaultInstance();
     private static Firestore db = firestoreOptions.getService();
 
-    // /add C:\Users\Asus\Desktop/cr7.jpg
-
-    private static String homeEndpoint = "/home";
+    private static final String svc_ip = "localhost";
+    private static final int svc_port = 7000;
+    private static ManagedChannel ch = ManagedChannelBuilder
+            .forAddress(svc_ip, svc_port)
+            .usePlaintext()
+            .build();
+    private static CNPhotosGrpc.CNPhotosStub stub = CNPhotosGrpc.newStub(ch);
 
     public static void main(String[] args) {
         String topicName = "Topic_T1",
@@ -50,23 +61,94 @@ public class CNPhotosClient {
         showHelp();
         do {
             String line = sc.nextLine();
-            if (line.startsWith("/exit")) break;
+            if(line.startsWith("/exit")) break;
             Matcher mAdd = ptAdd.matcher(line),
                     mSearchLabels = ptSearchLabels.matcher(line),
-                    mSearchFaces = ptSearchFaces.matcher(line);
-            if (mAdd.matches())
+                    mSearchFaces = ptSearchFaces.matcher(line),
+                    mSetMonitorTarget = ptSetMonitorTarget.matcher(line),
+                    mSetMonitorMaxMin = ptSetMonitorMaxMin.matcher(line);
+            if(mAdd.matches())
                 addImage(topicName, bucketName, mAdd.group(1));
-            else if (mSearchLabels.matches()) {
+            else if(mSearchLabels.matches()) {
                 String label = mSearchLabels.group(1);
                 List<String> labels = label.indexOf(';') == -1 ? Collections.singletonList(label) : Arrays.asList(label.split(";"));
                 labels.forEach(CNPhotosClient::searchImage);
-            } else if (mSearchFaces.matches())
+            } else if(mSearchFaces.matches())
                 searchImage(Integer.parseInt(mSearchFaces.group(1)));
-            else if (line.startsWith("/help"))
+            else if(line.startsWith("/help"))
                 showHelp();
+            else if(mSetMonitorTarget.matches())
+                setMonitorTargetPerc(Integer.parseInt(mSetMonitorTarget.group(1)));
+            else if(mSetMonitorMaxMin.matches())
+                setMonitorInstanceMaxMin(Integer.parseInt(mSetMonitorMaxMin.group(1)),
+                        Integer.parseInt(mSetMonitorMaxMin.group(2)));
+            else if(line.startsWith("/mon"))
+                showMonitorStatus();
             else
                 System.out.println("Invalid Command!");
-        } while (true);
+        } while(true);
+    }
+
+    private static void showMonitorStatus() {
+        stub.getMonitorState(
+                Empty.newBuilder().build(),
+                new StreamObserver<MonitorState>() {
+                    @Override
+                    public void onNext(MonitorState monitorState) {
+                        System.out.println(
+                                String.format("CPU usage: %.4f | %d instances",
+                                        monitorState.getCpuUsage(), monitorState.getNInstances()
+                                )
+                        );
+                    }
+
+                    @Override
+                    public void onError(Throwable throwable) {
+                        System.out.println("ERROR: " + throwable.getMessage());
+                    }
+
+                    @Override
+                    public void onCompleted() { }
+                }
+        );
+
+    }
+
+    private static void setMonitorInstanceMaxMin(int min, int max) {
+        stub.changeInstanceLimits(
+                InstanceLimit.newBuilder().setMin(min).setMax(max).build(),
+                new StreamObserver<Empty>() {
+                    @Override
+                    public void onNext(Empty empty) { }
+
+                    @Override
+                    public void onError(Throwable throwable) {
+                        System.out.println("ERROR: " + throwable.getMessage());
+                    }
+
+                    @Override
+                    public void onCompleted() { }
+                }
+        );
+    }
+
+    private static void setMonitorTargetPerc(int targetPerc) {
+        float perc = targetPerc / 100f;
+        stub.changeTargetCpuUsage(
+                TargetCpuUsage.newBuilder().setUsage(perc).build(),
+                new StreamObserver<Empty>() {
+                    @Override
+                    public void onNext(Empty empty) { }
+
+                    @Override
+                    public void onError(Throwable throwable) {
+                        System.out.println("ERROR: " + throwable.getMessage());
+                    }
+
+                    @Override
+                    public void onCompleted() { }
+                }
+        );
     }
 
     // 6 & 7
@@ -79,7 +161,7 @@ public class CNPhotosClient {
                 documents.stream()
                         .map(QueryDocumentSnapshot::getData)
                         .forEach(System.out::println);
-            } catch (InterruptedException | ExecutionException e) {
+            } catch(InterruptedException | ExecutionException e) {
                 e.printStackTrace();
             }
         }, poolExecutor);
@@ -93,9 +175,9 @@ public class CNPhotosClient {
         querySnapshot.addListener(() -> { // TODO make concurrent set to remove duplicates
             try {
                 List<QueryDocumentSnapshot> documents = querySnapshot.get().getDocuments();
-                for (QueryDocumentSnapshot doc : documents)
+                for(QueryDocumentSnapshot doc : documents)
                     System.out.println(doc.getData());
-            } catch (InterruptedException | ExecutionException e) {
+            } catch(InterruptedException | ExecutionException e) {
                 e.printStackTrace();
             }
         }, poolExecutor);
@@ -109,7 +191,7 @@ public class CNPhotosClient {
 
             // 2.2
             publishMessageOnTopic(topicName, blobId.getBucket(), blobId.getName());
-        } catch (Exception ex) {
+        } catch(Exception ex) {
             ex.printStackTrace();
         }
     }
@@ -123,18 +205,18 @@ public class CNPhotosClient {
         acls.add(acl);
         BlobInfo blobInfo =
                 BlobInfo.newBuilder(blobId).setContentType(contentType).setAcl(acls).build();
-        if (Files.size(uploadFrom) < 1_000_000) {
+        if(Files.size(uploadFrom) < 1_000_000) {
             byte[] bytes = Files.readAllBytes(uploadFrom);
             storage.create(blobInfo, bytes);
         } else {
-            try (WriteChannel writer = storage.writer(blobInfo)) {
+            try(WriteChannel writer = storage.writer(blobInfo)) {
                 byte[] buffer = new byte[1024];
-                try (InputStream input = Files.newInputStream(uploadFrom)) {
+                try(InputStream input = Files.newInputStream(uploadFrom)) {
                     int limit;
-                    while ((limit = input.read(buffer)) >= 0) {
+                    while((limit = input.read(buffer)) >= 0) {
                         try {
                             writer.write(ByteBuffer.wrap(buffer, 0, limit));
-                        } catch (Exception ex) {
+                        } catch(Exception ex) {
                             ex.printStackTrace();
                         }
                     }
@@ -156,18 +238,18 @@ public class CNPhotosClient {
             fut.addListener(() -> {
                 try {
                     System.out.println("MESSAGE PUBLISHED with ID=" + fut.get());
-                } catch (InterruptedException | ExecutionException e) {
+                } catch(InterruptedException | ExecutionException e) {
                     System.out.println("Error: " + e.getMessage());
                 } finally {
                     try {
                         publisher.shutdown();
-                    } catch (Exception e) {
+                    } catch(Exception e) {
                         System.out.println("Error: " + e.getMessage());
                     }
                 }
             }, poolExecutor);
 
-        } catch (IOException e) {
+        } catch(IOException e) {
             e.printStackTrace();
         }
     }
@@ -179,18 +261,5 @@ public class CNPhotosClient {
         System.out.println("/search <labels> - search images containing labels");
         System.out.println("/exit - leave");
         System.out.println("*** **** ***");
-    }
-
-    private static Object index(Request request, Response response) {
-        response.redirect(homeEndpoint);
-        return "";
-    }
-
-    private static Object home(Request request, Response response) {
-        return render(null, "home.hbs");
-    }
-
-    public static String render(Map<String, Object> model, String templatePath) {
-        return new HandlebarsTemplateEngine().render(new ModelAndView(model, templatePath));
     }
 }
