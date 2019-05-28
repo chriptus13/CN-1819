@@ -38,7 +38,7 @@ public class CNPhotosClient {
             ptSearchLabels = Pattern.compile("/searchLabels (.+)"),
             ptSearchFaces = Pattern.compile("/searchFaces (\\d+)"),
             ptSetMonitorTarget = Pattern.compile("/setMonTargetPerc (\\d+)"),
-            ptSetMonitorMaxMin = Pattern.compile("setMonInstanceMaxMin (\\d+) (\\d+)");
+            ptSetMonitorMaxMin = Pattern.compile("/setMonInstanceMinMax (\\d+) (\\d+)");
     private static final String PROJECT_ID = ServiceOptions.getDefaultProjectId();
     private static final Executor poolExecutor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
     private static StorageOptions storageOptions = StorageOptions.getDefaultInstance();
@@ -259,6 +259,9 @@ public class CNPhotosClient {
         System.out.println("/help - show commands");
         System.out.println("/add <img-path> - add image to the system");
         System.out.println("/search <labels> - search images containing labels");
+        System.out.println("/mon - check monitor status");
+        System.out.println("/setMonTargetPerc <perc> - set target cpu percentage (integer)");
+        System.out.println("/setMonInstanceMinMax <min> <max> - set min and max number of VM instances");
         System.out.println("/exit - leave");
         System.out.println("*** **** ***");
     }
