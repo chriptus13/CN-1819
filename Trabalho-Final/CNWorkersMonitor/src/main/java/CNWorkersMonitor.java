@@ -24,9 +24,9 @@ import java.util.*;
 
 public class CNWorkersMonitor extends CNPhotosGrpc.CNPhotosImplBase {
     private static final String PROJECT_ID = ServiceOptions.getDefaultProjectId();
-    private static final String ZONE_NAME = "";
-    private static final String INSTANCE_GROUP = "";
-    private static final String METRICS_SUB = "Subscription_M";
+    private static final String ZONE_NAME = "us-east1-b";
+    private static final String INSTANCE_GROUP = "cn-photos-group";
+    private static final String METRICS_SUB = "CN_Photos_Metrics_Subscription";
     private static final long INTERVAL = 15_000;
 
     private static final Object mon = new Object();
@@ -34,7 +34,7 @@ public class CNWorkersMonitor extends CNPhotosGrpc.CNPhotosImplBase {
     private static final Map<String, CpuPerc> map = new HashMap<>();
 
     private static final long MAX_ABOVE = 5;
-    private static final long MAX_BELOW = 100;
+    private static final long MAX_BELOW = 10;
     private static final int svcPort = 7000;
     private static long consecutiveAbove = 0;
     private static long consecutiveBelow = 0;
@@ -42,8 +42,8 @@ public class CNWorkersMonitor extends CNPhotosGrpc.CNPhotosImplBase {
     private static float avg;
     private static int currSize;
     private static Compute computeService;
-    private static int minInstances;
-    private static int maxInstances;
+    private static int minInstances = 1;
+    private static int maxInstances = 10;
 
     public static void main(String[] args) {
         try {
@@ -65,12 +65,12 @@ public class CNWorkersMonitor extends CNPhotosGrpc.CNPhotosImplBase {
                     .setApplicationName("Client")
                     .build();
 
-            subscribe().awaitRunning();
+            ApiService subscribe = subscribe();
 
             System.out.print("Press any key to terminate...");
             Scanner scanner = new Scanner(System.in);
             scanner.nextLine();
-
+            subscribe.stopAsync().awaitTerminated();
             svc.shutdown();
         } catch(GeneralSecurityException | IOException e) {
             e.printStackTrace();
@@ -88,6 +88,7 @@ public class CNWorkersMonitor extends CNPhotosGrpc.CNPhotosImplBase {
 
     private static void work(PubsubMessage msg, AckReplyConsumer ackReply) {
         // msg -> [hostname]:[cpu%]
+        System.out.println(msg.getData().toStringUtf8());
 
         String[] msgSplit = msg.getData().toStringUtf8().split(":");
         String hostname = msgSplit[0];
@@ -144,17 +145,21 @@ public class CNWorkersMonitor extends CNPhotosGrpc.CNPhotosImplBase {
     }
 
     private static void increaseInstanceGroup() throws IOException {
-        currSize = computeService.instanceGroups()
-                .get(PROJECT_ID, ZONE_NAME, INSTANCE_GROUP).size();
-        if(currSize < maxInstances)
+        currSize = computeService.instanceGroupManagers()
+                .get(PROJECT_ID, ZONE_NAME, INSTANCE_GROUP).execute().getTargetSize();
+        if(currSize < maxInstances) {
+            System.out.println("increasing....");
             resizeInstanceGroup(++currSize);
+        }
     }
 
     private static void decreaseInstanceGroup() throws IOException {
-        currSize = computeService.instanceGroups()
-                .get(PROJECT_ID, ZONE_NAME, INSTANCE_GROUP).size();
-        if(currSize > minInstances)
+        currSize = computeService.instanceGroupManagers()
+                .get(PROJECT_ID, ZONE_NAME, INSTANCE_GROUP).execute().getTargetSize();
+        if(currSize > minInstances) {
+            System.out.println("decreasing...");
             resizeInstanceGroup(--currSize);
+        }
     }
 
     private static void resizeInstanceGroup(int newSize) throws IOException {
@@ -191,12 +196,14 @@ public class CNWorkersMonitor extends CNPhotosGrpc.CNPhotosImplBase {
     @Override
     public void changeInstanceLimits(InstanceLimit request, StreamObserver<Empty> responseObserver) {
         setLimits(request.getMin(), request.getMax());
+        responseObserver.onNext(Empty.newBuilder().build());
         responseObserver.onCompleted();
     }
 
     @Override
     public void changeTargetCpuUsage(TargetCpuUsage request, StreamObserver<Empty> responseObserver) {
         setTarget(request.getUsage());
+        responseObserver.onNext(Empty.newBuilder().build());
         responseObserver.onCompleted();
     }
 

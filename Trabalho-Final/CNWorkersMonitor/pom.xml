@@ -22,22 +22,6 @@
             <artifactId>google-api-services-compute</artifactId>
             <version>v1-rev20190107-1.28.0</version>
         </dependency>
-
-        <dependency>
-            <groupId>io.grpc</groupId>
-            <artifactId>grpc-netty-shaded</artifactId>
-            <version>1.19.0</version>
-        </dependency>
-        <dependency>
-            <groupId>io.grpc</groupId>
-            <artifactId>grpc-protobuf</artifactId>
-            <version>1.19.0</version>
-        </dependency>
-        <dependency>
-            <groupId>io.grpc</groupId>
-            <artifactId>grpc-stub</artifactId>
-            <version>1.19.0</version>
-        </dependency>
         <dependency>
             <groupId>pt.isel.cn</groupId>
             <artifactId>CNMonitorContract</artifactId>
