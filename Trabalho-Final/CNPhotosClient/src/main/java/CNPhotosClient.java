@@ -3,6 +3,7 @@ import cnphotos.InstanceLimit;
 import cnphotos.MonitorState;
 import cnphotos.TargetCpuUsage;
 import com.google.api.core.ApiFuture;
+import com.google.api.core.SettableApiFuture;
 import com.google.cloud.ServiceOptions;
 import com.google.cloud.WriteChannel;
 import com.google.cloud.firestore.Firestore;
@@ -29,6 +30,7 @@ import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -46,7 +48,7 @@ public class CNPhotosClient {
     private static FirestoreOptions firestoreOptions = FirestoreOptions.getDefaultInstance();
     private static Firestore db = firestoreOptions.getService();
 
-    private static final String svc_ip = "localhost";
+    private static final String svc_ip = "34.73.245.206";
     private static final int svc_port = 7000;
     private static ManagedChannel ch = ManagedChannelBuilder
             .forAddress(svc_ip, svc_port)
@@ -61,32 +63,42 @@ public class CNPhotosClient {
         showHelp();
         do {
             String line = sc.nextLine();
-            if(line.startsWith("/exit")) break;
+            if (line.startsWith("/exit")) break;
             Matcher mAdd = ptAdd.matcher(line),
                     mSearchLabels = ptSearchLabels.matcher(line),
                     mSearchFaces = ptSearchFaces.matcher(line),
                     mSetMonitorTarget = ptSetMonitorTarget.matcher(line),
                     mSetMonitorMaxMin = ptSetMonitorMaxMin.matcher(line);
-            if(mAdd.matches())
+            if (mAdd.matches())
                 addImage(topicName, bucketName, mAdd.group(1));
-            else if(mSearchLabels.matches()) {
+            else if (mSearchLabels.matches()) {
                 String label = mSearchLabels.group(1);
                 List<String> labels = label.indexOf(';') == -1 ? Collections.singletonList(label) : Arrays.asList(label.split(";"));
-                labels.forEach(CNPhotosClient::searchImage);
-            } else if(mSearchFaces.matches())
+
+                ApiFuture<Set<String>> results = searchImage(labels);
+                results.addListener(() -> {
+                    try {
+                        Set<String> values = results.get();
+                        if (values.size() == 0) System.out.println("No results found!");
+                        else values.forEach(System.out::println);
+                    } catch (InterruptedException | ExecutionException e) {
+                        e.printStackTrace();
+                    }
+                }, poolExecutor);
+            } else if (mSearchFaces.matches())
                 searchImage(Integer.parseInt(mSearchFaces.group(1)));
-            else if(line.startsWith("/help"))
+            else if (line.startsWith("/help"))
                 showHelp();
-            else if(mSetMonitorTarget.matches())
+            else if (mSetMonitorTarget.matches())
                 setMonitorTargetPerc(Integer.parseInt(mSetMonitorTarget.group(1)));
-            else if(mSetMonitorMaxMin.matches())
+            else if (mSetMonitorMaxMin.matches())
                 setMonitorInstanceMaxMin(Integer.parseInt(mSetMonitorMaxMin.group(1)),
                         Integer.parseInt(mSetMonitorMaxMin.group(2)));
-            else if(line.startsWith("/mon"))
+            else if (line.startsWith("/mon"))
                 showMonitorStatus();
             else
                 System.out.println("Invalid Command!");
-        } while(true);
+        } while (true);
     }
 
     private static void showMonitorStatus() {
@@ -108,7 +120,8 @@ public class CNPhotosClient {
                     }
 
                     @Override
-                    public void onCompleted() { }
+                    public void onCompleted() {
+                    }
                 }
         );
 
@@ -119,7 +132,8 @@ public class CNPhotosClient {
                 InstanceLimit.newBuilder().setMin(min).setMax(max).build(),
                 new StreamObserver<Empty>() {
                     @Override
-                    public void onNext(Empty empty) { }
+                    public void onNext(Empty empty) {
+                    }
 
                     @Override
                     public void onError(Throwable throwable) {
@@ -127,7 +141,9 @@ public class CNPhotosClient {
                     }
 
                     @Override
-                    public void onCompleted() { }
+                    public void onCompleted() {
+                        System.out.println("SUCCESS");
+                    }
                 }
         );
     }
@@ -138,7 +154,8 @@ public class CNPhotosClient {
                 TargetCpuUsage.newBuilder().setUsage(perc).build(),
                 new StreamObserver<Empty>() {
                     @Override
-                    public void onNext(Empty empty) { }
+                    public void onNext(Empty empty) {
+                    }
 
                     @Override
                     public void onError(Throwable throwable) {
@@ -146,7 +163,9 @@ public class CNPhotosClient {
                     }
 
                     @Override
-                    public void onCompleted() { }
+                    public void onCompleted() {
+                        System.out.println("SUCCESS");
+                    }
                 }
         );
     }
@@ -158,29 +177,67 @@ public class CNPhotosClient {
         querySnapshot.addListener(() -> {
             try {
                 List<QueryDocumentSnapshot> documents = querySnapshot.get().getDocuments();
-                documents.stream()
+                if (documents.isEmpty()) System.out.println("No results found!");
+                else documents.stream()
                         .map(QueryDocumentSnapshot::getData)
+                        .map(map ->
+                                getBlobUrl(
+                                        (String) map.get("bucketName"),
+                                        (String) (map.get("blobNameWithFaces") == null
+                                                ? map.get("blobName")
+                                                : map.get("blobNameWithFaces")
+                                        )
+                                )
+                        )
                         .forEach(System.out::println);
-            } catch(InterruptedException | ExecutionException e) {
+            } catch (InterruptedException | ExecutionException e) {
                 e.printStackTrace();
             }
         }, poolExecutor);
     }
 
+    private static String getBlobUrl(String bucketName, String blobName) {
+        BlobId blobId = BlobId.of(bucketName, blobName);
+        BlobInfo blob = storage.get(blobId);
+        return blobName + "->" + blob.getMediaLink();
+    }
 
     // 6 & 7
-    private static void searchImage(String label) {
-        ApiFuture<QuerySnapshot> querySnapshot = db.collection("images")
-                .whereArrayContains("labels", label).get();
-        querySnapshot.addListener(() -> { // TODO make concurrent set to remove duplicates
-            try {
-                List<QueryDocumentSnapshot> documents = querySnapshot.get().getDocuments();
-                for(QueryDocumentSnapshot doc : documents)
-                    System.out.println(doc.getData());
-            } catch(InterruptedException | ExecutionException e) {
-                e.printStackTrace();
-            }
-        }, poolExecutor);
+    private static ApiFuture<Set<String>> searchImage(List<String> labels) {
+        final SettableApiFuture<Set<String>> fut = SettableApiFuture.create();
+        final Object mon = new Object();
+        final Set<String> results = new HashSet<>();
+        final AtomicInteger i = new AtomicInteger(labels.size());
+
+        labels.forEach(label -> {
+            ApiFuture<QuerySnapshot> querySnapshot = db.collection("images")
+                    .whereArrayContains("labels", label).get();
+            querySnapshot.addListener(() -> {
+                try {
+                    List<QueryDocumentSnapshot> documents = querySnapshot.get().getDocuments();
+                    documents.stream()
+                            .map(QueryDocumentSnapshot::getData)
+                            .map(map ->
+                                    getBlobUrl(
+                                            (String) map.get("bucketName"),
+                                            (String) map.get("blobName")
+                                    )
+                            )
+                            .forEach(r -> {
+                                synchronized (mon) {
+                                    results.add(r);
+                                }
+                            });
+                    if (i.updateAndGet(value -> value == 0 ? value : value - 1) == 0)
+                        fut.set(results);
+                } catch (InterruptedException | ExecutionException e) {
+                    e.printStackTrace();
+                }
+            }, poolExecutor);
+
+        });
+
+        return fut;
     }
 
     // 1
@@ -191,7 +248,7 @@ public class CNPhotosClient {
 
             // 2.2
             publishMessageOnTopic(topicName, blobId.getBucket(), blobId.getName());
-        } catch(Exception ex) {
+        } catch (Exception ex) {
             ex.printStackTrace();
         }
     }
@@ -205,18 +262,18 @@ public class CNPhotosClient {
         acls.add(acl);
         BlobInfo blobInfo =
                 BlobInfo.newBuilder(blobId).setContentType(contentType).setAcl(acls).build();
-        if(Files.size(uploadFrom) < 1_000_000) {
+        if (Files.size(uploadFrom) < 1_000_000) {
             byte[] bytes = Files.readAllBytes(uploadFrom);
             storage.create(blobInfo, bytes);
         } else {
-            try(WriteChannel writer = storage.writer(blobInfo)) {
+            try (WriteChannel writer = storage.writer(blobInfo)) {
                 byte[] buffer = new byte[1024];
-                try(InputStream input = Files.newInputStream(uploadFrom)) {
+                try (InputStream input = Files.newInputStream(uploadFrom)) {
                     int limit;
-                    while((limit = input.read(buffer)) >= 0) {
+                    while ((limit = input.read(buffer)) >= 0) {
                         try {
                             writer.write(ByteBuffer.wrap(buffer, 0, limit));
-                        } catch(Exception ex) {
+                        } catch (Exception ex) {
                             ex.printStackTrace();
                         }
                     }
@@ -238,18 +295,18 @@ public class CNPhotosClient {
             fut.addListener(() -> {
                 try {
                     System.out.println("MESSAGE PUBLISHED with ID=" + fut.get());
-                } catch(InterruptedException | ExecutionException e) {
+                } catch (InterruptedException | ExecutionException e) {
                     System.out.println("Error: " + e.getMessage());
                 } finally {
                     try {
                         publisher.shutdown();
-                    } catch(Exception e) {
+                    } catch (Exception e) {
                         System.out.println("Error: " + e.getMessage());
                     }
                 }
             }, poolExecutor);
 
-        } catch(IOException e) {
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
@@ -258,7 +315,8 @@ public class CNPhotosClient {
         System.out.println("*** Help ***");
         System.out.println("/help - show commands");
         System.out.println("/add <img-path> - add image to the system");
-        System.out.println("/search <labels> - search images containing labels");
+        System.out.println("/searchFaces <number> - search images containing a certain number of daces");
+        System.out.println("/searchLabels <label;...> - search images containing labels");
         System.out.println("/mon - check monitor status");
         System.out.println("/setMonTargetPerc <perc> - set target cpu percentage (integer)");
         System.out.println("/setMonInstanceMinMax <min> <max> - set min and max number of VM instances");

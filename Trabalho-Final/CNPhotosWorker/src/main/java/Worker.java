@@ -57,7 +57,6 @@ public class Worker {
     private static void work(PubsubMessage msg, AckReplyConsumer ackReply) {
         // msg -> <bucketName;;blobName>
         String[] msgSplit = msg.getData().toStringUtf8().split(";;");
-        ackReply.ack();
 
         ByteArrayOutputStream newImg = null;
         try {
@@ -91,7 +90,7 @@ public class Worker {
             }
 
             storeInDB(image);
-
+            ackReply.ack();
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
