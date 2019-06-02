@@ -48,17 +48,20 @@ public class CNPhotosClient {
     private static FirestoreOptions firestoreOptions = FirestoreOptions.getDefaultInstance();
     private static Firestore db = firestoreOptions.getService();
 
-    private static final String svc_ip = "34.73.245.206";
     private static final int svc_port = 7000;
-    private static ManagedChannel ch = ManagedChannelBuilder
-            .forAddress(svc_ip, svc_port)
-            .usePlaintext()
-            .build();
-    private static CNPhotosGrpc.CNPhotosStub stub = CNPhotosGrpc.newStub(ch);
+    private static CNPhotosGrpc.CNPhotosStub stub;
 
     public static void main(String[] args) {
         String topicName = "Topic_T1",
                 bucketName = "cnphotos-g06";
+
+        String svc_ip = args[0];
+
+        ManagedChannel ch = ManagedChannelBuilder
+                .forAddress(svc_ip, svc_port)
+                .usePlaintext()
+                .build();
+        stub = CNPhotosGrpc.newStub(ch);
 
         showHelp();
         do {
