@@ -1,48 +1,33 @@
 # CN-1819
 
-## How to run
+This repository contains the implementation for Cloud Computing [labs](/Labs) and a final project [CNPhotos](/Trabalho-Final) which allows storing and catalog by a set of identified characteristics submitted images using GCP Vision API.
 
-1. Confirm that topics ```Topic_T1``` and ```CN_Photos_Metrics``` exist such as subscriptions ```Subscription_A``` and ```CN_Photos_Metrics_Subscription```.
+These labs and project were solved in Computação na Nuvem (Cloud Computing) subject in [ISEL](https://www.isel.pt) during my degree in Computer Science and Computer Engineering.
 
-    **Topic_T1**: topic where will be publish images to process.
+## Learning objectives
 
-    **Subscription_A**: subscription which all workers will be subscribers.
+* Cloud Computing
+* Cloud Computing models (IAS, PAS, SAS)
+* [Google Cloud Platform](https://cloud.google.com)
+* Virtualization
+* Distributed Storage
+* Publisher/Subscriber communication model and patterns
+* Distributed Systems
+* Coordination, synchronization and consensus algorithms
+* Usage of metrics for auto-scaling
 
-    **CN_Photos_Metrics**: topic where will be publish metrics of the workers.
+## Technologies used
 
-    **CN_Photos_Metrics_Subscription**: subscription which the component of management will be subscribe to receive all metrics off the workers.
+* Java
+* Sockets
+* Java RMI
+* gRPC
+* GCP Compute Engine
+* GCP Pub/Sub
+* GCP Storage
+* [Firestore](https://firebase.google.com/docs/firestore)
+* [Vision API](https://cloud.google.com/vision)
 
-2. Confirm that the instance group ```cn-photos-group``` exist at zone ```us-east1-b``` or create one with the same name at the same zone using ```cn-photos-worker``` instance template.
+## Authors
 
-3. Confirm that VM instance responsable for monitoring is running or create one with ```cn-photos-monitor``` instance template.
-
-4. Confirm that bucket ```cnphotos-g06``` exist.
-
-5. Create JSON key from the service account ```cn-photos@g06-li-leirt61d.iam.gserviceaccount.com``` and set environment variable *GOOGLE_APPLICATION_CREDENTIALS* with path to the JSON jey created.
-
-6. Build contract jar.
-
-    ```bash
-    cd Trabalho-Final/CNMonitorContract
-    mvn package
-    ```
-
-7. Build client application jar.
-
-    ```bash
-    cd Trabalho-Final/CNPhotosClient
-    mvn package
-    ```
-
-8. Run client application (console application).
-
-    * CJP - contract jar path.
-    * CAJP - client application jar path.
-    * EIP - External IP of VM instance responsable for monitoring.
-
-    ```bash
-    cd Trabalho-Final/CNPhotosClient
-    java -cp {CJP}:{CAJP} Client {EIP}
-    ```
-
-9. For more information about the commands to use enter ```/help```.
+These labs and project were developed with [Cláudio Bartolomeu](https://github.com/cbartolomeu) and [Ana Gaspar](https://github.com/ximenes13).
