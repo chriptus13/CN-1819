@@ -1,4 +1,4 @@
-# 1819v_cn_li61d_g06
+# CN-1819
 
 ## How to run
 
